@@ -6,6 +6,7 @@ A Streamlit app that compares an NHO attendance Excel file against the Miami-Dad
 
 - Accepts attendance files with `N`, `NAME`, and `EMAIL` columns.
 - Reads tracker sheets even when their header row or column labels differ.
+- Treats `Pre-hire Training`, `Classmarts`, and `ClassSmarts Cert.` as the same process.
 - Searches the active recruiting sheets and skips archive/reference sheets.
 - Matches by exact email first, exact normalized name second, and optional approximate name last.
 - Shows the recruiter's tracker sheet, onboarding stage, current requirement values, notes, and every missing process from **Pre-hire Training** through **Badge Photo**.
