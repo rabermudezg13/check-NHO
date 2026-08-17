@@ -164,6 +164,8 @@ def read_attendance(file_bytes):
 
 def is_complete(field, value):
     value = normalize_text(value)
+    if field == "Fingerprint Screening":
+        return value == "approved"
     if not value:
         return False
     incomplete_terms = (
