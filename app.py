@@ -53,6 +53,8 @@ ARCHIVE_SHEETS = {
     "inactivated during hiring", "newly activated", "rejected",
 }
 
+EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
 
 def clean_header(value):
     text = normalize_text(value)
@@ -78,7 +80,7 @@ def normalize_email(value):
 def find_header_row(rows):
     for index, row in enumerate(rows[:12]):
         headers = {clean_header(value) for value in row if value is not None}
-        if "applicant name" in headers and "talent email" in headers:
+        if "applicant name" in headers and ("talent email" in headers or "ksn id" in headers):
             return index
     return None
 
@@ -89,6 +91,16 @@ def canonical_column(header):
         if any(candidate == alias or candidate.startswith(alias + " ") for alias in aliases):
             return canonical
     return None
+
+
+def infer_email_column(rows, header_index):
+    """Find the most email-like column when the tracker header is misspelled."""
+    scores = {}
+    for row in rows[header_index + 1:header_index + 51]:
+        for index, value in enumerate(row):
+            if EMAIL_PATTERN.match(normalize_email(value)):
+                scores[index] = scores.get(index, 0) + 1
+    return max(scores, key=scores.get) if scores else None
 
 
 @st.cache_data(show_spinner=False)
@@ -110,6 +122,10 @@ def read_tracker(file_bytes):
             canonical = canonical_column(header)
             if canonical and canonical not in column_map:
                 column_map[canonical] = index
+        if "Talent Email" not in column_map:
+            inferred_email = infer_email_column(rows, header_index)
+            if inferred_email is not None:
+                column_map["Talent Email"] = inferred_email
         if "Applicant Name" not in column_map or "Talent Email" not in column_map:
             continue
         for row in rows[header_index + 1:]:
