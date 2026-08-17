@@ -13,7 +13,7 @@ A Streamlit app that compares an NHO attendance Excel file against the Miami-Dad
 - Shows the recruiter's tracker sheet, onboarding stage, current requirement values, notes, and every missing process from **Pre-hire Training** through **Badge Photo**.
 - Exports the complete comparison to a formatted Excel file.
 - Exports a print-ready PDF summary with fingerprint alerts in red.
-- Highlights the full row in red when fingerprints are missing, pending, or marked `Info Requested`.
+- Treats fingerprints as valid only when their status is exactly `Approved`; every other status highlights the full row in red.
 - Processes uploaded files in memory; the app does not intentionally save them.
 
 ## Run locally
