@@ -6,6 +6,7 @@ from difflib import SequenceMatcher
 import pandas as pd
 import streamlit as st
 from openpyxl import load_workbook
+from openpyxl.styles import Font, PatternFill
 
 
 st.set_page_config(page_title="NHO Attendance Checker", page_icon="✅", layout="wide")
@@ -181,14 +182,16 @@ def compare(attendance, tracker, threshold):
         if match is None:
             row.update({"Tracker Name": "", "Tracker Email": "", "Tracker Sheet": "",
                         "Current Onboarding Stage": "", "Missing Requirements": "Not found in tracker",
-                        "Notes": ""})
+                        "Fingerprint Alert": "", "Notes": ""})
         else:
             missing = [field for field in REQUIREMENTS if not is_complete(field, match.get(field, ""))]
+            fingerprint_value = match.get("Fingerprint Screening", "")
             row.update({"Tracker Name": match.get("Applicant Name", ""),
                         "Tracker Email": match.get("Talent Email", ""),
                         "Tracker Sheet": match.get("Tracker Sheet", ""),
                         "Current Onboarding Stage": match.get("Current Onboarding Stage", ""),
                         "Missing Requirements": ", ".join(missing) if missing else "None",
+                        "Fingerprint Alert": "YES — ACTION REQUIRED" if not is_complete("Fingerprint Screening", fingerprint_value) else "",
                         "Notes": match.get("Notes", "")})
             for field in REQUIREMENTS:
                 row[field] = match.get(field, "")
@@ -204,8 +207,16 @@ def make_excel(results):
         sheet.freeze_panes = "A2"
         sheet.auto_filter.ref = sheet.dimensions
         for cell in sheet[1]:
-            cell.font = cell.font.copy(bold=True, color="FFFFFF")
-            cell.fill = cell.fill.copy(fill_type="solid", fgColor="4C9F38")
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(fill_type="solid", fgColor="4C9F38")
+        alert_column = next(cell.column for cell in sheet[1] if cell.value == "Fingerprint Alert")
+        red_fill = PatternFill(fill_type="solid", fgColor="7F1D1D")
+        white_font = Font(color="FFFFFF", bold=True)
+        for row in sheet.iter_rows(min_row=2):
+            if row[alert_column - 1].value:
+                for cell in row:
+                    cell.fill = red_fill
+                    cell.font = white_font
         for column in sheet.columns:
             width = min(50, max(12, max(len(str(cell.value or "")) for cell in column) + 2))
             sheet.column_dimensions[column[0].column_letter].width = width
@@ -243,7 +254,13 @@ if attendance_file and tracker_file:
         if filter_choice == "Exact": shown = results[results["Match Result"].isin(["Email match", "Name match"])]
         elif filter_choice == "Review": shown = results[results["Match Result"].eq("Possible match – review")]
         elif filter_choice == "Not found": shown = results[results["Match Result"].eq("Not found")]
-        st.dataframe(shown, use_container_width=True, hide_index=True,
+        def highlight_fingerprint_alert(row):
+            if row.get("Fingerprint Alert", "") == "YES — ACTION REQUIRED":
+                return ["background-color: #7f1d1d; color: #ffffff; font-weight: 600"] * len(row)
+            return [""] * len(row)
+
+        styled = shown.style.apply(highlight_fingerprint_alert, axis=1)
+        st.dataframe(styled, use_container_width=True, hide_index=True,
                      column_config={"Match Score": st.column_config.ProgressColumn(min_value=0, max_value=100)})
         st.download_button("Download comparison as Excel", make_excel(results),
                            file_name="NHO_comparison.xlsx",
