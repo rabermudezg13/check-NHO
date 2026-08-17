@@ -7,6 +7,12 @@ import pandas as pd
 import streamlit as st
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import landscape, letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
 st.set_page_config(page_title="NHO Attendance Checker", page_icon="✅", layout="wide")
@@ -223,6 +229,93 @@ def make_excel(results):
     return buffer.getvalue()
 
 
+def make_pdf(results):
+    buffer = io.BytesIO()
+    document = SimpleDocTemplate(
+        buffer, pagesize=landscape(letter),
+        rightMargin=0.35 * inch, leftMargin=0.35 * inch,
+        topMargin=0.5 * inch, bottomMargin=0.45 * inch,
+        title="NHO Attendance Comparison",
+    )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "ReportTitle", parent=styles["Title"], fontName="Helvetica-Bold",
+        fontSize=18, leading=21, textColor=colors.HexColor("#253746"),
+        spaceAfter=4,
+    )
+    subtitle_style = ParagraphStyle(
+        "ReportSubtitle", parent=styles["Normal"], fontSize=9, leading=11,
+        textColor=colors.HexColor("#52616B"), spaceAfter=9,
+    )
+    cell_style = ParagraphStyle(
+        "TableCell", parent=styles["BodyText"], fontSize=7, leading=8.5,
+        textColor=colors.HexColor("#1F2933"),
+    )
+    header_style = ParagraphStyle(
+        "TableHeader", parent=cell_style, fontName="Helvetica-Bold",
+        textColor=colors.white, alignment=TA_CENTER,
+    )
+    alert_cell_style = ParagraphStyle(
+        "AlertTableCell", parent=cell_style, fontName="Helvetica-Bold",
+        textColor=colors.white,
+    )
+
+    def paragraph(value, style=cell_style):
+        safe = str(value if value is not None else "").replace("–", "-").replace("—", "-")
+        safe = safe.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        return Paragraph(safe, style)
+
+    data = [[paragraph(value, header_style) for value in
+             ["#", "NHO Name", "Match", "Tracker Sheet", "Stage", "Fingerprints", "Missing Processes"]]]
+    for _, row in results.iterrows():
+        row_style = alert_cell_style if row.get("Fingerprint Alert", "") == "YES — ACTION REQUIRED" else cell_style
+        data.append([
+            paragraph(row.get("N", ""), row_style), paragraph(row.get("NHO Name", ""), row_style),
+            paragraph(row.get("Match Result", ""), row_style), paragraph(row.get("Tracker Sheet", ""), row_style),
+            paragraph(row.get("Current Onboarding Stage", ""), row_style),
+            paragraph(row.get("Fingerprint Screening", ""), row_style),
+            paragraph(row.get("Missing Requirements", ""), row_style),
+        ])
+
+    table = Table(data, repeatRows=1,
+                  colWidths=[0.32 * inch, 1.25 * inch, 0.85 * inch, 0.75 * inch,
+                             1.35 * inch, 0.85 * inch, 3.83 * inch])
+    commands = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4C9F38")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD2D9")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+    for index, (_, row) in enumerate(results.iterrows(), start=1):
+        if row.get("Fingerprint Alert", "") == "YES — ACTION REQUIRED":
+            commands.extend([
+                ("BACKGROUND", (0, index), (-1, index), colors.HexColor("#7F1D1D")),
+                ("TEXTCOLOR", (0, index), (-1, index), colors.white),
+            ])
+        elif index % 2 == 0:
+            commands.append(("BACKGROUND", (0, index), (-1, index), colors.HexColor("#F4F7F2")))
+    table.setStyle(TableStyle(commands))
+
+    exact = int(results["Match Result"].isin(["Email match", "Name match"]).sum())
+    alerts = int(results["Fingerprint Alert"].eq("YES — ACTION REQUIRED").sum())
+    story = [
+        Paragraph("NHO Attendance Comparison", title_style),
+        Paragraph(f"Attendees: {len(results)} &nbsp;&nbsp; Exact matches: {exact} &nbsp;&nbsp; Fingerprint alerts: {alerts}", subtitle_style),
+        table, Spacer(1, 4),
+    ]
+
+    def add_page_number(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(colors.HexColor("#52616B"))
+        canvas.drawRightString(10.65 * inch, 0.2 * inch, f"Page {doc.page}")
+        canvas.restoreState()
+
+    document.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
+    return buffer.getvalue()
+
+
 st.title("NHO Attendance Checker")
 st.caption("Compare an NHO attendance list with the Miami-Dade onboarding tracker.")
 
@@ -262,10 +355,16 @@ if attendance_file and tracker_file:
         styled = shown.style.apply(highlight_fingerprint_alert, axis=1)
         st.dataframe(styled, use_container_width=True, hide_index=True,
                      column_config={"Match Score": st.column_config.ProgressColumn(min_value=0, max_value=100)})
-        st.download_button("Download comparison as Excel", make_excel(results),
-                           file_name="NHO_comparison.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                           type="primary")
+        download_excel, download_pdf = st.columns(2)
+        with download_excel:
+            st.download_button("Download comparison as Excel", make_excel(results),
+                               file_name="NHO_comparison.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                               type="primary", use_container_width=True)
+        with download_pdf:
+            st.download_button("Download comparison as PDF", make_pdf(results),
+                               file_name="NHO_comparison.pdf", mime="application/pdf",
+                               use_container_width=True)
     except Exception as error:
         st.error(f"Could not compare the files: {error}")
 else:
