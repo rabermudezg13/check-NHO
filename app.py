@@ -24,7 +24,11 @@ FIELD_ALIASES = {
     "HP Overview Template": ["hp overview template"],
     "OB365": ["ob365"],
     "District Release": ["district release"],
-    "Pre-hire Training": ["pre hire training", "prehire training", "classmarts", "classmarts cert"],
+    "Pre-hire Training": [
+        "pre hire training", "prehire training",
+        "classmarts", "classmarts cert",
+        "classsmarts", "classsmarts cert",
+    ],
     "Safety & Security": ["safety security", "policy explainer cert"],
     "Onboarding Introduction Email": ["onboarding introduction email"],
     "I-9": ["i 9", "i9"],
