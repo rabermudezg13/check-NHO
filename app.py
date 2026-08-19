@@ -218,7 +218,7 @@ def compare(attendance, tracker, threshold):
                         "Tracker Email": match.get("Talent Email", ""),
                         "Tracker Sheet": match.get("Tracker Sheet", ""),
                         "Current Onboarding Stage": match.get("Current Onboarding Stage", ""),
-                        "Missing Requirements": ", ".join(missing) if missing else "None",
+                        "Missing Requirements": ", ".join(missing) if missing else "—",
                         "Fingerprint Alert": "YES — ACTION REQUIRED" if not is_complete("Fingerprint Screening", fingerprint_value) else "",
                         "Notes": match.get("Notes", "")})
             for field in REQUIREMENTS:
