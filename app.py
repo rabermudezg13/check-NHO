@@ -43,9 +43,9 @@ FIELD_ALIASES = {
 }
 
 REQUIREMENTS = [
-    "Pre-hire Training", "Safety & Security", "Onboarding Introduction Email", "I-9",
-    "Education Requirement", "Drug Screen", "Background Check",
-    "Fingerprint Screening", "MDPS Training", "Badge Photo",
+    "I-9",
+    "Drug Screen",
+    "Fingerprint Screening",
 ]
 
 ARCHIVE_SHEETS = {
