@@ -288,6 +288,10 @@ def make_pdf(results):
         "AlertTableCell", parent=cell_style, fontName="Helvetica-Bold",
         textColor=colors.white,
     )
+    pending_cell_style = ParagraphStyle(
+        "PendingTableCell", parent=cell_style, fontName="Helvetica-Bold",
+        textColor=colors.HexColor("#7F6000"),
+    )
 
     def paragraph(value, style=cell_style):
         safe = str(value if value is not None else "").replace("–", "-").replace("—", "-")
@@ -297,7 +301,12 @@ def make_pdf(results):
     data = [[paragraph(value, header_style) for value in
              ["#", "NHO Name", "Match", "Tracker Sheet", "Stage", "Fingerprints", "Missing Processes"]]]
     for _, row in results.iterrows():
-        row_style = alert_cell_style if row.get("Fingerprint Alert", "") == "YES — ACTION REQUIRED" else cell_style
+        if row.get("Fingerprint Alert", "") == "YES — ACTION REQUIRED":
+            row_style = alert_cell_style
+        elif row.get("Missing Requirements", "") not in ("", "—"):
+            row_style = pending_cell_style
+        else:
+            row_style = cell_style
         data.append([
             paragraph(row.get("N", ""), row_style), paragraph(row.get("NHO Name", ""), row_style),
             paragraph(row.get("Match Result", ""), row_style), paragraph(row.get("Tracker Sheet", ""), row_style),
@@ -321,6 +330,11 @@ def make_pdf(results):
             commands.extend([
                 ("BACKGROUND", (0, index), (-1, index), colors.HexColor("#7F1D1D")),
                 ("TEXTCOLOR", (0, index), (-1, index), colors.white),
+            ])
+        elif row.get("Missing Requirements", "") not in ("", "—"):
+            commands.extend([
+                ("BACKGROUND", (0, index), (-1, index), colors.HexColor("#FFF2CC")),
+                ("TEXTCOLOR", (0, index), (-1, index), colors.HexColor("#7F6000")),
             ])
         elif index % 2 == 0:
             commands.append(("BACKGROUND", (0, index), (-1, index), colors.HexColor("#F4F7F2")))
