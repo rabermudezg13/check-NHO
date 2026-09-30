@@ -53,6 +53,14 @@ ARCHIVE_SHEETS = {
     "newly activated", "rejected",
 }
 
+INACTIVE_SHEETS = {"inactivated during hiring", "inactived"}
+RECRUITERS = {
+    "RB": "Rodrigo Bermudez",
+    "DL": "Demetrius Lee",
+    "JS": "Jorge Silva",
+    "MV": "Miccael Val",
+}
+
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
@@ -137,6 +145,12 @@ def read_tracker(file_bytes):
             for field, index in column_map.items():
                 record[field] = row[index] if index < len(row) and row[index] is not None else ""
             record["Tracker Sheet"] = worksheet.title
+            record["Recruiter"] = ""
+            if normalize_text(worksheet.title) in INACTIVE_SHEETS:
+                initials = normalize_text(row[14] if len(row) > 14 else None).upper()
+                record["Recruiter"] = RECRUITERS.get(
+                    initials, f"Unknown ({initials})" if initials else "—"
+                )
             record["_name"] = normalize_name(name)
             record["_email"] = normalize_email(email)
             records.append(record)
@@ -208,7 +222,7 @@ def compare(attendance, tracker, threshold):
         row = {"N": attendee["N"], "NHO Name": attendee["NAME"], "NHO Email": attendee["EMAIL"],
                "Match Result": match_type, "Match Score": score}
         if match is None:
-            row.update({"Tracker Name": "", "Tracker Email": "", "Tracker Sheet": "",
+            row.update({"Tracker Name": "", "Tracker Email": "", "Tracker Sheet": "", "Recruiter": "",
                         "Current Onboarding Stage": "", "Missing Requirements": "Not found in tracker",
                         "Fingerprint Alert": "", "Notes": ""})
         else:
@@ -217,6 +231,7 @@ def compare(attendance, tracker, threshold):
             row.update({"Tracker Name": match.get("Applicant Name", ""),
                         "Tracker Email": match.get("Talent Email", ""),
                         "Tracker Sheet": match.get("Tracker Sheet", ""),
+                        "Recruiter": match.get("Recruiter", ""),
                         "Current Onboarding Stage": match.get("Current Onboarding Stage", ""),
                         "Missing Requirements": ", ".join(missing) if missing else "—",
                         "Fingerprint Alert": "YES — ACTION REQUIRED" if not is_complete("Fingerprint Screening", fingerprint_value) else "",
@@ -299,7 +314,7 @@ def make_pdf(results):
         return Paragraph(safe, style)
 
     data = [[paragraph(value, header_style) for value in
-             ["#", "NHO Name", "Match", "Tracker Sheet", "Stage", "Fingerprints", "Missing Processes"]]]
+             ["#", "NHO Name", "Match", "Tracker Sheet / Recruiter", "Stage", "Fingerprints", "Missing Processes"]]]
     for _, row in results.iterrows():
         if row.get("Fingerprint Alert", "") == "YES — ACTION REQUIRED":
             row_style = alert_cell_style
@@ -309,7 +324,9 @@ def make_pdf(results):
             row_style = cell_style
         data.append([
             paragraph(row.get("N", ""), row_style), paragraph(row.get("NHO Name", ""), row_style),
-            paragraph(row.get("Match Result", ""), row_style), paragraph(row.get("Tracker Sheet", ""), row_style),
+            paragraph(row.get("Match Result", ""), row_style),
+            paragraph(" / ".join(str(value) for value in
+                                [row.get("Tracker Sheet", ""), row.get("Recruiter", "")] if value), row_style),
             paragraph(row.get("Current Onboarding Stage", ""), row_style),
             paragraph(row.get("Fingerprint Screening", ""), row_style),
             paragraph(row.get("Missing Requirements", ""), row_style),
