@@ -50,7 +50,7 @@ REQUIREMENTS = [
 
 ARCHIVE_SHEETS = {
     "landing page", "drop downs", "template", "call back", "transitions",
-    "inactivated during hiring", "newly activated", "rejected",
+    "newly activated", "rejected",
 }
 
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
